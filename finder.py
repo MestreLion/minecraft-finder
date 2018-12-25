@@ -28,6 +28,7 @@ from xdg.BaseDirectory import xdg_cache_home
 
 import numpy
 
+
 import pymctoolslib as mc
 
 if __name__ == '__main__':
@@ -102,12 +103,29 @@ def main(argv=None):
 
     try:
         world, _ = mc.load_player_dimension(args.world, args.player)
+        log.debug(type(world))
+        log.debug(type(world))
+
+        entitycount = 0
+        blockcount  = 0
 
         if args.entity is not None:
-            log.info("Searching for '%s' on the entire world", args.entity)
+            log.info("Searching for entity '%s' on the entire world", args.entity)
             entityid = args.entity
-            entitycount = 0
-            for chunk in mc.iter_chunks(world,  progress=args.loglevel==logging.INFO):
+
+        if args.block is not None:
+            try:
+                # if args.block is a numerical string, convert to int
+                args.block = int(args.block)
+            except ValueError:
+                # If string, convert to CamelCase
+                args.block = args.block.title()
+
+            block = world.materials[args.block]
+            log.info("Searching for block '%s' on the entire world", block.name)
+
+        for chunk in mc.iter_chunks(world,  progress=args.loglevel==logging.INFO):
+            if args.entity is not None:
                 for entity in chunk.Entities:
                     entity = mc.Entity(entity)
                     log.debug(entity)
@@ -116,21 +134,19 @@ def main(argv=None):
                         entitycount += 1
                         #log.info(logcoords(world, chunk, (_.value for _ in entity["Pos"])))
                         log.info(entity)
-                        if entityid == "Villager":
-                            villager = mc.Villager(entity)
-                            log.info(villager)
+
+            if args.block is not None:
+                cx, cz = chunk.chunkPosition
+                for xc, zc, y in zip(*numpy.where(chunk.Blocks == block.ID)):
+                    blockcount += 1
+                    x, z = xc + 16 * cx, zc + 16 * cz
+                    log.info(logcoords(world, chunk, (x, y, z)))
+
+        if args.entity is not None:
             log.info("%s: %d", entityid, entitycount)
 
         if args.block is not None:
-            blockcount = 0
-            blockname = world.materials[args.block].name
-            for chunk in sorted(world.getChunks(), key=lambda chunk: chunk.chunkPosition):
-                cx, cz = chunk.chunkPosition
-                for xc, zc, y in zip(*numpy.where(chunk.Blocks == args.block)):
-                    blockcount += 1
-                    x, z = xc + 16 * cx, zc + 16 * cz
-                    log.debug(logcoords(world, chunk, (x, y, z)))
-            log.info("%s: %d", blockname, blockcount)
+            log.info("%s: %d", block.name, blockcount)
 
 
     except mc.MCError as e:
