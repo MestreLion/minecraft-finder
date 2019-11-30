@@ -61,7 +61,7 @@ def setuplogging(level):
         fh.setLevel(logging.DEBUG)
         logger.addHandler(fh)
     except IOError as e:  # Probably access denied
-        logger.warn("%s\nLogging will not work.", e)
+        logger.warning("%s\nLogging will not work.", e)
 
 
 def parseargs(args=None):
@@ -102,38 +102,36 @@ def main(argv=None):
     log.debug(args)
 
     try:
-        world, _ = mc.load_player_dimension(args.world, args.player)
-        log.debug(type(world))
-        log.debug(type(world))
+        world = mc.World(args.world)
 
         entitycount = 0
         blockcount  = 0
 
         if args.entity is not None:
             log.info("Searching for entity '%s' on the entire world", args.entity)
-            entityid = args.entity
+            eid = ename = args.entity.lower()
+            if ':' not in eid:
+                eid = 'minecraft:' + eid
 
         if args.block is not None:
-            try:
-                # if args.block is a numerical string, convert to int
-                args.block = int(args.block)
-            except ValueError:
-                # If string, convert to CamelCase
-                args.block = args.block.title()
+            log.warning("Block finding does not work in Minecraft 1.13 onwards")
+            args.block = None
+            block = None
+            #block = world.materials[args.block]
+            #log.info("Searching for block '%s' on the entire world", block.name)
 
-            block = world.materials[args.block]
-            log.info("Searching for block '%s' on the entire world", block.name)
-
-        for chunk in mc.iter_chunks(world,  progress=args.loglevel==logging.INFO):
+        for chunk in world.iter_chunks(progress=(args.loglevel==logging.INFO)):
             if args.entity is not None:
                 for entity in chunk.Entities:
                     entity = mc.Entity(entity)
                     log.debug(entity)
-                    if args.entity.lower() == entity.name.lower():   # entity["id"].lower():
-                        entityid = entity["id"]
+                    if eid == entity["id"] or ename == entity.name.lower():
+                        eid = entity["id"]
+                        ename = entity.name
                         entitycount += 1
                         #log.info(logcoords(world, chunk, (_.value for _ in entity["Pos"])))
-                        log.info(entity)
+                        log.info("%s [%r]", entity, entity)
+                        log.debug(entity.get_nbt())
 
             if args.block is not None:
                 cx, cz = chunk.chunkPosition
@@ -143,7 +141,7 @@ def main(argv=None):
                     log.info(logcoords(world, chunk, (x, y, z)))
 
         if args.entity is not None:
-            log.info("%s: %d", entityid, entitycount)
+            log.info("%s [%s]: %d", ename, eid, entitycount)
 
         if args.block is not None:
             log.info("%s: %d", block.name, blockcount)
