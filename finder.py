@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 #
 #    Copyright (C) 2018 Rodrigo Silva (MestreLion) <linux@rodrigosilva.com>
 #
@@ -28,8 +27,8 @@ from xdg.BaseDirectory import xdg_cache_home
 
 import numpy
 
+import mcworldlib as mc
 
-import pymctoolslib as mc
 
 if __name__ == '__main__':
     myname = osp.basename(osp.splitext(__file__)[0])
@@ -41,13 +40,7 @@ log = logging.getLogger(myname)
 
 def setuplogging(level):
     # Console output
-    for logger, lvl in [(log, level),
-                        # pymclevel is too verbose
-                        (logging.getLogger("pymclevel"), logging.WARNING)]:
-        sh = logging.StreamHandler()
-        sh.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-        sh.setLevel(lvl)
-        logger.addHandler(sh)
+    logging.basicConfig(level=level, format='%(levelname)s: %(message)s')
 
     # File output
     logger = logging.getLogger()  # root logger, so it also applies to pymclevel
@@ -98,11 +91,12 @@ def logcoords(world, chunk, coords=()):
 def main(argv=None):
     args = parseargs(argv)
 
-    setuplogging(args.loglevel)
+    #setuplogging(args.loglevel)
+    logging.basicConfig(level=args.loglevel, format='%(levelname)s: %(message)s')
     log.debug(args)
 
     try:
-        world = mc.World(args.world)
+        world = mc.load(args.world)
 
         entitycount = 0
         blockcount  = 0
@@ -120,18 +114,17 @@ def main(argv=None):
             #block = world.materials[args.block]
             #log.info("Searching for block '%s' on the entire world", block.name)
 
-        for chunk in world.iter_chunks(progress=(args.loglevel==logging.INFO)):
+        for chunk in world.get_chunks(progress=(args.loglevel==logging.INFO)):
             if args.entity is not None:
-                for entity in chunk.Entities:
-                    entity = mc.Entity(entity)
+                for entity in chunk.entities:
                     log.debug(entity)
                     if eid == entity["id"] or ename == entity.name.lower():
                         eid = entity["id"]
                         ename = entity.name
                         entitycount += 1
                         #log.info(logcoords(world, chunk, (_.value for _ in entity["Pos"])))
-                        log.info("%s [%r]", entity, entity)
-                        log.debug(entity.get_nbt())
+                        log.info("%s [%r]", entity, chunk)
+                        log.debug("%r", entity)  # NBT
 
             if args.block is not None:
                 cx, cz = chunk.chunkPosition
