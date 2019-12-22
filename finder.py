@@ -26,6 +26,7 @@ import logging
 from xdg.BaseDirectory import xdg_cache_home
 
 import numpy
+import tqdm
 
 import mcworldlib as mc
 
@@ -62,6 +63,9 @@ def parseargs(args=None):
 
     parser.add_argument('--entity', '-e', help="Entity ID to search;")
     parser.add_argument('--block',  '-b', help="Block ID to search;")
+    parser.add_argument('--tag-name', '-tn', help="NBT tag name to search;")
+    parser.add_argument('--tag-value', '-tv', help="NBT tag value to search;")
+    parser.add_argument('--tag-path', '-tp', help="NBT tag path to search;")
 
     return parser.parse_args(args)
 
@@ -86,6 +90,16 @@ def logcoords(world, chunk, coords=()):
             % (rx, rz, cxr, czr, cx, cz, pos))
 
 
+def nbt_walk(tag, path=None):
+    if isinstance(tag, list):
+        for i, item in enumerate(tag):
+            yield from nbt_walk(item, f"{path}.{i}")
+    elif isinstance(tag, dict):
+        for k, item in tag.items():
+            if not k: k = "''"
+            yield from nbt_walk(item, f"{path}.{k}" if path else k)
+    elif isinstance(tag, (str, int, float)):
+        yield path, tag
 
 
 def main(argv=None):
@@ -114,7 +128,19 @@ def main(argv=None):
             #block = world.materials[args.block]
             #log.info("Searching for block '%s' on the entire world", block.name)
 
-        for chunk in world.get_chunks(progress=(args.loglevel==logging.INFO)):
+        for chunk in tqdm.tqdm(world.get_chunks(progress=(args.loglevel==logging.INFO))):
+            if (args.tag_value is not None or
+                args.tag_name  is not None or
+                args.tag_path  is not None
+            ):
+                for tag_path, tag in nbt_walk(chunk):
+                    if (
+                        (args.tag_value is not None and args.tag_value in str(tag)) or
+                        (args.tag_name  is not None and tag_path.lower().split('.')[-1] ==  args.tag_name.lower()) or
+                        (args.tag_path  is not None and tag_path.lower().startswith(args.tag_path.lower()))
+                    ):
+                        log.info("R%s,C%s %s: %r", chunk.region.pos, chunk.pos, tag_path, tag)
+
             if args.entity is not None:
                 for entity in chunk.entities:
                     log.debug(entity)
@@ -123,7 +149,8 @@ def main(argv=None):
                         ename = entity.name
                         entitycount += 1
                         #log.info(logcoords(world, chunk, (_.value for _ in entity["Pos"])))
-                        log.info("%s [%r]", entity, chunk)
+                        log.info("R%s,C%s: %s", chunk.region.pos, chunk.pos, entity)
+                        #log.info("[%r] %s", chunk, entity)
                         log.debug("%r", entity)  # NBT
 
             if args.block is not None:
