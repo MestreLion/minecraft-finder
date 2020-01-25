@@ -26,7 +26,7 @@ import logging
 from xdg.BaseDirectory import xdg_cache_home
 
 #import numpy
-import tqdm
+#import tqdm
 
 import mcworldlib as mc
 
@@ -128,7 +128,7 @@ def main(argv=None):
             log.info("Searching for block '%s' on the entire world", bid)
             #block = world.materials[args.block]
 
-        for chunk in tqdm.tqdm(world.get_chunks(progress=(args.loglevel==logging.INFO))):
+        for chunk in world.get_chunks(progress=(args.loglevel > logging.INFO)):
             if (args.tag_value is not None or
                 args.tag_name  is not None or
                 args.tag_path  is not None
@@ -169,7 +169,7 @@ def main(argv=None):
                     #log.info(logcoords(world, chunk, (x, y, z)))
 
         if args.entity is not None:
-            log.info("%s [%s]: %d", ename, eid, entitycount)
+            print(f"{ename} [{eid}]: {entitycount}")
 
         if args.block is not None:
             print(f"{bname} [{bid}]: {blockcount}")
