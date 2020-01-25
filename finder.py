@@ -25,7 +25,7 @@ import os.path as osp
 import logging
 from xdg.BaseDirectory import xdg_cache_home
 
-import numpy
+#import numpy
 import tqdm
 
 import mcworldlib as mc
@@ -122,11 +122,11 @@ def main(argv=None):
                 eid = 'minecraft:' + eid
 
         if args.block is not None:
-            log.warning("Block finding does not work in Minecraft 1.13 onwards")
-            args.block = None
-            block = None
+            bid = bname = args.block.lower()  # @UnusedVariable
+            if ':' not in bid:
+                bid = 'minecraft:' + bid
+            log.info("Searching for block '%s' on the entire world", bid)
             #block = world.materials[args.block]
-            #log.info("Searching for block '%s' on the entire world", block.name)
 
         for chunk in tqdm.tqdm(world.get_chunks(progress=(args.loglevel==logging.INFO))):
             if (args.tag_value is not None or
@@ -154,17 +154,25 @@ def main(argv=None):
                         log.debug("%r", entity)  # NBT
 
             if args.block is not None:
-                cx, cz = chunk.chunkPosition
-                for xc, zc, y in zip(*numpy.where(chunk.Blocks == block.ID)):
-                    blockcount += 1
-                    x, z = xc + 16 * cx, zc + 16 * cz
-                    log.info(logcoords(world, chunk, (x, y, z)))
+                for section in chunk.root.get('Sections', []):
+                    for p, palette in enumerate(section.get('Palette', [])):
+                        if palette['Name'] == bid:
+                            log.info("R(%2d, %2d), C(%2d, %2d), SY %d, P %2d: %s",
+                                     *chunk.region.pos,
+                                     *chunk.pos,
+                                     section['Y'], p, palette)
+                            blockcount += 1  #FIXME: not actual block count!
+                #cx, cz = chunk.chunkPosition
+                #for xc, zc, y in zip(*numpy.where(chunk.Blocks == block.ID)):
+                    #blockcount += 1
+                    #x, z = xc + 16 * cx, zc + 16 * cz
+                    #log.info(logcoords(world, chunk, (x, y, z)))
 
         if args.entity is not None:
             log.info("%s [%s]: %d", ename, eid, entitycount)
 
         if args.block is not None:
-            log.info("%s: %d", block.name, blockcount)
+            print(f"{bname} [{bid}]: {blockcount}")
 
 
     except mc.MCError as e:
