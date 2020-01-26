@@ -156,7 +156,8 @@ def main(argv=None):
             if args.block is not None:
                 for section in chunk.root.get('Sections', []):
                     for p, palette in enumerate(section.get('Palette', [])):
-                        if palette['Name'] == bid:
+                        blockid = str(palette['Name'])
+                        if blockid == bid or bname in blockid:
                             log.info("R(%2d, %2d), C(%2d, %2d), SY %d, P %2d: %s",
                                      *chunk.region.pos,
                                      *chunk.pos,
