@@ -61,11 +61,11 @@ def setuplogging(level):
 def parseargs(args=None):
     parser = mc.basic_parser(description=__doc__)
 
-    parser.add_argument('--entity', '-e', help="Entity ID to search;")
-    parser.add_argument('--block',  '-b', help="Block ID to search;")
-    parser.add_argument('--tag-name', '-tn', help="NBT tag name to search;")
-    parser.add_argument('--tag-value', '-tv', help="NBT tag value to search;")
-    parser.add_argument('--tag-path', '-tp', help="NBT tag path to search;")
+    parser.add_argument( '-e', '--entity',    help="Entity ID to search")
+    parser.add_argument( '-b', '--block',     help="Block ID to search")
+    parser.add_argument('-tn', '--tag-name',  help="NBT tag name to search")
+    parser.add_argument('-tv', '--tag-value', help="NBT tag value to search")
+    parser.add_argument('-tp', '--tag-path',  help="NBT tag path to search")
 
     return parser.parse_args(args)
 
@@ -139,7 +139,7 @@ def main(argv=None):
                         (args.tag_name  is not None and tag_path.lower().split('.')[-1] ==  args.tag_name.lower()) or
                         (args.tag_path  is not None and tag_path.lower().startswith(args.tag_path.lower()))
                     ):
-                        log.info("R%s,C%s %s: %r", chunk.region.pos, chunk.pos, tag_path, tag)
+                        log.info("R%s, C%s %s: %r", chunk.region.pos, chunk.pos, tag_path, tag)
 
             if args.entity is not None:
                 for entity in chunk.entities:
@@ -149,7 +149,7 @@ def main(argv=None):
                         ename = entity.name
                         entitycount += 1
                         #log.info(logcoords(world, chunk, (_.value for _ in entity["Pos"])))
-                        log.info("R%s,C%s: %s", chunk.region.pos, chunk.pos, entity)
+                        log.info("R%s, C%s: %s", chunk.region.pos, chunk.pos, entity)
                         #log.info("[%r] %s", chunk, entity)
                         log.debug("%r", entity)  # NBT
 
