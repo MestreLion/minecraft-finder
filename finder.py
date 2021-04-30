@@ -163,6 +163,14 @@ def main(argv=None):
                                      *chunk.pos,
                                      section['Y'], p, palette)
                             blockcount += 1  #FIXME: not actual block count!
+                for t, tile in enumerate(chunk.root.get('TileEntities', [])):
+                    blockid = str(tile['id'])
+                    if blockid == bid or bname in blockid:
+                        log.info("R(%2d, %2d), C(%2d, %2d), TE %d: %s",
+                                 *chunk.region.pos,
+                                 *chunk.pos,
+                                 t, tile)
+                        blockcount += 1  #FIXME: not actual block count!
                 #cx, cz = chunk.chunkPosition
                 #for xc, zc, y in zip(*numpy.where(chunk.Blocks == block.ID)):
                     #blockcount += 1
