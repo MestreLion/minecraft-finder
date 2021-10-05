@@ -112,8 +112,7 @@ def main(argv=None):
 
         entitycount = 0
         blockcount  = 0
-        eid = bid = 0
-        ename = bname = ""
+        eid = bid = ename = bname = ""
 
         if args.entity is not None:
             log.info("Searching for entity '%s' on the entire world", args.entity)
