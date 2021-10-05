@@ -25,9 +25,6 @@ import os.path as osp
 import logging
 from xdg.BaseDirectory import xdg_cache_home
 
-#import numpy
-#import tqdm
-
 import mcworldlib as mc
 
 
@@ -39,7 +36,7 @@ else:
 log = logging.getLogger(myname)
 
 
-def setuplogging(level):
+def setup_logging(level):
     # Console output
     logging.basicConfig(level=level, format='%(levelname)s: %(message)s')
 
@@ -58,11 +55,11 @@ def setuplogging(level):
         logger.warning("%s\nLogging will not work.", e)
 
 
-def parseargs(args=None):
+def parse_args(args=None):
     parser = mc.basic_parser(description=__doc__)
 
-    parser.add_argument( '-e', '--entity',    help="Entity ID to search")
-    parser.add_argument( '-b', '--block',     help="Block ID to search")
+    parser.add_argument('-e',  '--entity',    help="Entity ID to search")
+    parser.add_argument('-b',  '--block',     help="Block ID to search")
     parser.add_argument('-tn', '--tag-name',  help="NBT tag name to search")
     parser.add_argument('-tv', '--tag-value', help="NBT tag value to search")
     parser.add_argument('-tp', '--tag-path',  help="NBT tag path to search")
@@ -76,7 +73,7 @@ def chunkcoords(world, chunk):
     return region.regionCoords, (cx & 0x1F, cz & 0x1F), (cx, cz)
 
 
-def logcoords(world, chunk, coords=()):
+def logcoords(world, chunk, coords=None):
     if coords:
         x, y, z = coords
         pos = "\tPosition [%5d, %5d, %5d]" % (x, z, y)
@@ -96,16 +93,17 @@ def nbt_walk(tag, path=None):
             yield from nbt_walk(item, f"{path}.{i}")
     elif isinstance(tag, dict):
         for k, item in tag.items():
-            if not k: k = "''"
+            if not k:
+                k = "''"
             yield from nbt_walk(item, f"{path}.{k}" if path else k)
     elif isinstance(tag, (str, int, float)):
         yield path, tag
 
 
 def main(argv=None):
-    args = parseargs(argv)
+    args = parse_args(argv)
 
-    #setuplogging(args.loglevel)
+    # setup_logging(args.loglevel)
     logging.basicConfig(level=args.loglevel, format='%(levelname)s: %(message)s')
     log.debug(args)
 
@@ -114,6 +112,8 @@ def main(argv=None):
 
         entitycount = 0
         blockcount  = 0
+        eid = bid = 0
+        ename = bname = ""
 
         if args.entity is not None:
             log.info("Searching for entity '%s' on the entire world", args.entity)
@@ -126,7 +126,7 @@ def main(argv=None):
             if ':' not in bid:
                 bid = 'minecraft:' + bid
             log.info("Searching for block '%s' on the entire world", bid)
-            #block = world.materials[args.block]
+            # block = world.materials[args.block]
 
         for chunk in world.get_chunks(progress=(args.loglevel > logging.INFO)):
             if (args.tag_value is not None or
@@ -136,7 +136,7 @@ def main(argv=None):
                 for tag_path, tag in nbt_walk(chunk):
                     if (
                         (args.tag_value is not None and args.tag_value in str(tag)) or
-                        (args.tag_name  is not None and tag_path.lower().split('.')[-1] ==  args.tag_name.lower()) or
+                        (args.tag_name  is not None and tag_path.lower().split('.')[-1] == args.tag_name.lower()) or
                         (args.tag_path  is not None and tag_path.lower().startswith(args.tag_path.lower()))
                     ):
                         log.info("R%s, C%s %s: %r", chunk.region.pos, chunk.pos, tag_path, tag)
@@ -148,9 +148,9 @@ def main(argv=None):
                         eid = entity["id"]
                         ename = entity.name
                         entitycount += 1
-                        #log.info(logcoords(world, chunk, (_.value for _ in entity["Pos"])))
+                        # log.info(logcoords(world, chunk, (_.value for _ in entity["Pos"])))
                         log.info("R%s, C%s: %s", chunk.region.pos, chunk.pos, entity)
-                        #log.info("[%r] %s", chunk, entity)
+                        # log.info("[%r] %s", chunk, entity)
                         log.debug("%r", entity)  # NBT
 
             if args.block is not None:
@@ -162,7 +162,7 @@ def main(argv=None):
                                      *chunk.region.pos,
                                      *chunk.pos,
                                      section['Y'], p, palette)
-                            blockcount += 1  #FIXME: not actual block count!
+                            blockcount += 1  # FIXME: not actual block count!
                 for t, tile in enumerate(chunk.root.get('TileEntities', [])):
                     blockid = str(tile['id'])
                     if blockid == bid or bname in blockid:
@@ -170,12 +170,12 @@ def main(argv=None):
                                  *chunk.region.pos,
                                  *chunk.pos,
                                  t, tile)
-                        blockcount += 1  #FIXME: not actual block count!
-                #cx, cz = chunk.chunkPosition
-                #for xc, zc, y in zip(*numpy.where(chunk.Blocks == block.ID)):
-                    #blockcount += 1
-                    #x, z = xc + 16 * cx, zc + 16 * cz
-                    #log.info(logcoords(world, chunk, (x, y, z)))
+                        blockcount += 1  # FIXME: not actual block count!
+                # cx, cz = chunk.chunkPosition
+                # for xc, zc, y in zip(*numpy.where(chunk.Blocks == block.ID)):
+                    # blockcount += 1
+                    # x, z = xc + 16 * cx, zc + 16 * cz
+                    # log.info(logcoords(world, chunk, (x, y, z)))
 
         if args.entity is not None:
             print(f"{ename} [{eid}]: {entitycount}")
@@ -183,19 +183,16 @@ def main(argv=None):
         if args.block is not None:
             print(f"{bname} [{bid}]: {blockcount}")
 
-
     except mc.MCError as e:
         log.error(e)
         return
 
 
-
-
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as e:
-        log.critical(e, exc_info=True)
+    except Exception as _e:
+        log.critical(_e, exc_info=True)
         sys.exit(1)
     except KeyboardInterrupt:
         pass
