@@ -18,11 +18,11 @@
 """
 Find and list things in a Minecraft world
 """
-
-import sys
+import logging
 import os
 import os.path as osp
-import logging
+import re
+import sys
 from xdg.BaseDirectory import xdg_cache_home
 
 import mcworldlib as mc
@@ -88,16 +88,27 @@ def logcoords(world, chunk, coords=None):
 
 
 def nbt_walk(tag, path=None):
+    """Yield 3-tuples of dot-separated tag paths, tag leaf names and corresponding values"""
     if isinstance(tag, list):
         for i, item in enumerate(tag):
             yield from nbt_walk(item, f"{path}.{i}")
     elif isinstance(tag, dict):
         for k, item in tag.items():
-            if not k:
-                k = "''"
             yield from nbt_walk(item, f"{path}.{k}" if path else k)
     elif isinstance(tag, (str, int, float)):
-        yield path, tag
+        yield path, path.split('.')[-1], tag
+    elif not isinstance(tag, (mc.nbt.ByteArray, mc.nbt.IntArray, mc.nbt.LongArray)):
+        log.warning("Unexpected tag type in %s=%r: %s", path, tag, type(tag))
+
+
+def match_tag(value, search, exact=False):
+    if value is None:  # Nothing to match
+        return True
+    if isinstance(search, str):
+        if exact:
+            return value.lower() == search.lower()
+        return bool(re.search(value, search, re.IGNORECASE))
+    return type(search)(value) == search  # ints and floats
 
 
 def main(argv=None):
@@ -127,18 +138,17 @@ def main(argv=None):
             log.info("Searching for block '%s' on the entire world", bid)
             # block = world.materials[args.block]
 
-        for chunk in world.get_chunks(progress=(args.loglevel > logging.INFO)):
+        for chunk in world.get_chunks(progress=(args.loglevel >= logging.INFO)):
             if (args.tag_value is not None or
                 args.tag_name  is not None or
                 args.tag_path  is not None
             ):
-                for tag_path, tag in nbt_walk(chunk):
-                    if (
-                        (args.tag_value is not None and args.tag_value in str(tag)) or
-                        (args.tag_name  is not None and tag_path.lower().split('.')[-1] == args.tag_name.lower()) or
-                        (args.tag_path  is not None and tag_path.lower().startswith(args.tag_path.lower()))
+                for tag_path, tag_name, tag_value in nbt_walk(chunk):
+                    if (match_tag(args.tag_path,  tag_path) and
+                        match_tag(args.tag_name,  tag_name) and
+                        match_tag(args.tag_value, tag_value)
                     ):
-                        log.info("R%s, C%s %s: %r", chunk.region.pos, chunk.pos, tag_path, tag)
+                        log.info("R%s, C%s %s: %r", chunk.region.pos, chunk.pos, tag_path, tag_value)
 
             if args.entity is not None:
                 for entity in chunk.entities:
