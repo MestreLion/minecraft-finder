@@ -118,90 +118,87 @@ def main(argv=None):
     logging.basicConfig(level=args.loglevel, format='%(levelname)s: %(message)s')
     log.debug(args)
 
-    try:
-        world = mc.load(args.world)
+    world = mc.load(args.world)
 
-        entitycount = 0
-        blockcount  = 0
-        eid = bid = ename = bname = ""
+    entitycount = 0
+    blockcount  = 0
+    eid = bid = ename = bname = ""
+
+    if args.entity is not None:
+        log.info("Searching for entity '%s' on the entire world", args.entity)
+        eid = ename = args.entity.lower()
+        if ':' not in eid:
+            eid = 'minecraft:' + eid
+
+    if args.block is not None:
+        bid = bname = args.block.lower()  # @UnusedVariable
+        if ':' not in bid:
+            bid = 'minecraft:' + bid
+        log.info("Searching for block '%s' on the entire world", bid)
+        # block = world.materials[args.block]
+
+    for chunk in world.get_chunks(progress=(args.loglevel >= logging.INFO)):
+        if (args.tag_value is not None or
+            args.tag_name  is not None or
+            args.tag_path  is not None
+        ):
+            for tag_path, tag_name, tag_value in nbt_walk(chunk):
+                if (match_tag(args.tag_path,  tag_path) and
+                    match_tag(args.tag_name,  tag_name) and
+                    match_tag(args.tag_value, tag_value)
+                ):
+                    log.info("R%s, C%s %s: %r", chunk.region.pos, chunk.pos, tag_path, tag_value)
 
         if args.entity is not None:
-            log.info("Searching for entity '%s' on the entire world", args.entity)
-            eid = ename = args.entity.lower()
-            if ':' not in eid:
-                eid = 'minecraft:' + eid
+            for entity in chunk.entities:
+                log.debug(entity)
+                if eid == entity["id"] or ename == entity.name.lower():
+                    eid = entity["id"]
+                    ename = entity.name
+                    entitycount += 1
+                    # log.info(logcoords(world, chunk, (_.value for _ in entity["Pos"])))
+                    log.info("R%s, C%s: %s", chunk.region.pos, chunk.pos, entity)
+                    # log.info("[%r] %s", chunk, entity)
+                    log.debug("%r", entity)  # NBT
 
         if args.block is not None:
-            bid = bname = args.block.lower()  # @UnusedVariable
-            if ':' not in bid:
-                bid = 'minecraft:' + bid
-            log.info("Searching for block '%s' on the entire world", bid)
-            # block = world.materials[args.block]
-
-        for chunk in world.get_chunks(progress=(args.loglevel >= logging.INFO)):
-            if (args.tag_value is not None or
-                args.tag_name  is not None or
-                args.tag_path  is not None
-            ):
-                for tag_path, tag_name, tag_value in nbt_walk(chunk):
-                    if (match_tag(args.tag_path,  tag_path) and
-                        match_tag(args.tag_name,  tag_name) and
-                        match_tag(args.tag_value, tag_value)
-                    ):
-                        log.info("R%s, C%s %s: %r", chunk.region.pos, chunk.pos, tag_path, tag_value)
-
-            if args.entity is not None:
-                for entity in chunk.entities:
-                    log.debug(entity)
-                    if eid == entity["id"] or ename == entity.name.lower():
-                        eid = entity["id"]
-                        ename = entity.name
-                        entitycount += 1
-                        # log.info(logcoords(world, chunk, (_.value for _ in entity["Pos"])))
-                        log.info("R%s, C%s: %s", chunk.region.pos, chunk.pos, entity)
-                        # log.info("[%r] %s", chunk, entity)
-                        log.debug("%r", entity)  # NBT
-
-            if args.block is not None:
-                for section in chunk.root.get('Sections', []):
-                    for p, palette in enumerate(section.get('Palette', [])):
-                        blockid = str(palette['Name'])
-                        if blockid == bid or bname in blockid:
-                            log.info("R(%2d, %2d), C(%2d, %2d), SY %d, P %2d: %s",
-                                     *chunk.region.pos,
-                                     *chunk.pos,
-                                     section['Y'], p, palette)
-                            blockcount += 1  # FIXME: not actual block count!
-                for t, tile in enumerate(chunk.root.get('TileEntities', [])):
-                    blockid = str(tile['id'])
+            for section in chunk.root.get('Sections', []):
+                for p, palette in enumerate(section.get('Palette', [])):
+                    blockid = str(palette['Name'])
                     if blockid == bid or bname in blockid:
-                        log.info("R(%2d, %2d), C(%2d, %2d), TE %d: %s",
+                        log.info("R(%2d, %2d), C(%2d, %2d), SY %d, P %2d: %s",
                                  *chunk.region.pos,
                                  *chunk.pos,
-                                 t, tile)
+                                 section['Y'], p, palette)
                         blockcount += 1  # FIXME: not actual block count!
-                # cx, cz = chunk.chunkPosition
-                # for xc, zc, y in zip(*numpy.where(chunk.Blocks == block.ID)):
-                    # blockcount += 1
-                    # x, z = xc + 16 * cx, zc + 16 * cz
-                    # log.info(logcoords(world, chunk, (x, y, z)))
+            for t, tile in enumerate(chunk.root.get('TileEntities', [])):
+                blockid = str(tile['id'])
+                if blockid == bid or bname in blockid:
+                    log.info("R(%2d, %2d), C(%2d, %2d), TE %d: %s",
+                             *chunk.region.pos,
+                             *chunk.pos,
+                             t, tile)
+                    blockcount += 1  # FIXME: not actual block count!
+            # cx, cz = chunk.chunkPosition
+            # for xc, zc, y in zip(*numpy.where(chunk.Blocks == block.ID)):
+                # blockcount += 1
+                # x, z = xc + 16 * cx, zc + 16 * cz
+                # log.info(logcoords(world, chunk, (x, y, z)))
 
-        if args.entity is not None:
-            print(f"{ename} [{eid}]: {entitycount}")
+    if args.entity is not None:
+        print(f"{ename} [{eid}]: {entitycount}")
 
-        if args.block is not None:
-            print(f"{bname} [{bid}]: {blockcount}")
-
-    except mc.MCError as e:
-        log.error(e)
-        return
+    if args.block is not None:
+        print(f"{bname} [{bid}]: {blockcount}")
 
 
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as _e:
-        log.critical(_e, exc_info=True)
+    except mc.MCError as error:
+        log.error(error)
+    except Exception as error:
+        log.critical(error, exc_info=True)
         sys.exit(1)
     except KeyboardInterrupt:
         pass
