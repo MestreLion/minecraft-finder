@@ -63,6 +63,10 @@ def parse_args(args=None):
     parser.add_argument('-tn', '--tag-name',  help="NBT tag name to search")
     parser.add_argument('-tv', '--tag-value', help="NBT tag value to search")
     parser.add_argument('-tp', '--tag-path',  help="NBT tag path to search")
+    parser.add_argument('-tt', '--tag-type',  help="NBT tag type to search")
+    parser.add_argument('-te', '--tag-exclude', nargs='+',
+                        help="NBT tag key to prune from search, such as:"
+                             " TileTicks LiquidTicks Lights LiquidsToBeTicked ToBeTicked")
 
     return parser.parse_args(args)
 
@@ -87,28 +91,42 @@ def logcoords(world, chunk, coords=None):
             % (rx, rz, cxr, czr, cx, cz, pos))
 
 
-def nbt_walk(tag, path=None):
+def nbt_walk(tag, path=None, prune=()):
     """Yield 3-tuples of dot-separated tag paths, tag leaf names and corresponding values"""
     if isinstance(tag, list):
         for i, item in enumerate(tag):
-            yield from nbt_walk(item, f"{path}.{i}")
+            yield from nbt_walk(item, f"{path}.{i}", prune)
     elif isinstance(tag, dict):
         for k, item in tag.items():
-            yield from nbt_walk(item, f"{path}.{k}" if path else k)
+            if k in prune:
+                continue
+            yield from nbt_walk(item, (f"{path}.{k}" if path else k), prune)
     elif isinstance(tag, (str, int, float)):
         yield path, path.split('.')[-1], tag
     elif not isinstance(tag, (mc.nbt.ByteArray, mc.nbt.IntArray, mc.nbt.LongArray)):
         log.warning("Unexpected tag type in %s=%r: %s", path, tag, type(tag))
 
 
-def match_tag(value, search, exact=False):
+def match_tag(value, search, exact=False, cls=False) -> bool:
+    """
+    :param value: What I'm looking for, None to abort
+    :param search: Some data from NBT. Might be path, key, or value
+    :param exact:
+    :param cls: perform a class (type) match
+    :return:
+    """
     if value is None:  # Nothing to match
         return True
+    if cls:
+        return value == search.__class__.__name__
+    # search might be path (str), key (str) or value (tag)
     if isinstance(search, str):
         if exact:
             return value.lower() == search.lower()
         return bool(re.search(value, search, re.IGNORECASE))
-    return type(search)(value) == search  # ints and floats
+    # search will always be a tag, so value must be converted to numeric
+    # Not sure if Compound and List accepts SNBT, so keeping this generic
+    return search.__class__(value) == search  # ints and floats
 
 
 def main(argv=None):
@@ -140,6 +158,7 @@ def main(argv=None):
     if (
             args.tag_value is not None or
             args.tag_name  is not None or
+            args.tag_type  is not None or
             args.tag_path  is not None
     ):
         find_nbt(world, args)
@@ -148,22 +167,27 @@ def main(argv=None):
 
 def find_nbt(world: mc.World, args):
     def match(nbt):
-        for path, name, value in nbt_walk(nbt):
+        if args.tag_exclude:
+            prune = set(args.tag_exclude)
+        else:
+            prune = ()
+        for path, name, value in nbt_walk(nbt, prune=prune):
             if (
                     match_tag(args.tag_path,  path) and
                     match_tag(args.tag_name,  name) and
+                    match_tag(args.tag_type,  value, cls=True) and
                     match_tag(args.tag_value, value)
             ):
                 yield path, value
 
     for tag_path, tag_value in match(world.level):
-        log.info("%s: %r", tag_path, tag_value)
+        print("%s: %r" % (tag_path, tag_value))
 
-    for dimension, category, chunk in world.get_all_chunks(progress=(args.loglevel >= logging.INFO)):
+    for dimension, category, chunk in world.get_all_chunks(progress=(args.loglevel == logging.INFO)):
         for tag_path, tag_value in match(chunk):
-            log.info("%s %s R%s, C%s %s: %r",
-                     dimension.name.title(), category.title(),
-                     chunk.region.pos, chunk.pos, tag_path, tag_value)
+            print("%s %s R%s, C%s %s: %r" % (
+                  dimension.name.title(), category.title(),
+                  chunk.region.pos, chunk.pos, tag_path, tag_value))
 
 
 def find_entity(chunk, eid, ename):
